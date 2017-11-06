@@ -2,7 +2,7 @@ package main
 
 type MidiChannel struct {
 	id         MidiChannelId
-	instrument Instrument
+	instrument MidiControllable
 }
 
 func (channel *MidiChannel) handleEvent(event MidiChannelEvent) {
@@ -20,8 +20,4 @@ func (channel *MidiChannel) handleEvent(event MidiChannelEvent) {
 	case ChannelAftertouch:
 		channel.instrument.ChannelAftertouch(param1, param2)
 	}
-}
-
-func (channel *MidiChannel) getSound(output *[]float32) {
-	channel.instrument.generateSound(output)
 }

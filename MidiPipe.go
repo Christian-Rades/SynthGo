@@ -16,12 +16,11 @@ const (
 	MetaEvent         MidiEventType = 0xFF
 )
 
-type Instrument interface {
+type MidiControllable interface {
 	NoteOn(parameter1 uint8, parameter2 uint8)
 	NoteOff(parameter1 uint8, parameter2 uint8)
 	NoteAftertouch(parameter1 uint8, parameter2 uint8)
 	ChannelAftertouch(parameter1 uint8, parameter2 uint8)
-	generateSound(output *[]float32)
 }
 
 type MidiEvent struct {

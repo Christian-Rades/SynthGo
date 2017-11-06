@@ -1,48 +1,22 @@
 package main
 
-import(
+import (
 	AD "github.com/gordonklaus/portaudio"
 )
 
-const(
-	buf1 uint = iota
-	buf2 uint = iota
-)
-
-const (
-	AudioStart uint = iota
-	AudioStop uint = iota
-)
-
-type AudioContext  struct{
-	stream 	*AD.Stream
-	sampleRate uint
-	currentBuffer uint
-	bufferChannel chan *[]float32
-	buffer1 []float32
-	buffer2 []float32
+type AudioContext struct {
+	stream        *AD.Stream
+	sampleRate    uint
+	bufferChannel chan []float32
 }
 
-
 func newAudioContext(sampleRate uint, bufferSize uint) (context *AudioContext, err error) {
-	context = &AudioContext{nil, sampleRate, buf1, make(chan *[]float32),make([]float32, bufferSize),make([]float32, bufferSize)}
+	context = &AudioContext{nil, sampleRate, make(chan []float32, 1)}
 
 	callback := func(out []float32) {
-		switch context.currentBuffer {
-		case buf1:
-			context.bufferChannel <- &context.buffer2
-			for i := range out{
-				out[i] = context.buffer1[i] * 0.1
-			}
-			context.currentBuffer = buf2
-			return
-		case buf2:
-			context.bufferChannel <- &context.buffer1
-			for i := range out{
-				out[i] = context.buffer2[i] * 0.1
-			}
-			context.currentBuffer = buf1
-			return
+		buffer := <-context.bufferChannel
+		for i := range out {
+			out[i] = buffer[i] * 0.1
 		}
 	}
 

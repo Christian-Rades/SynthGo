@@ -4,6 +4,11 @@ import (
 	"math"
 )
 
+type MidiInstrument interface {
+	Sampler
+	MidiControllable
+}
+
 type Note struct {
 	on   bool
 	adsr *ADSRenvelope
@@ -43,7 +48,7 @@ func newSineWave(sampleRate uint) *SineWave {
 	return &SineWave{sampleRate, *notes}
 }
 
-func (sineWave *SineWave) getSample() (out float32) {
+func (sineWave *SineWave) Sample() (out float32) {
 	for _, note := range sineWave.notes {
 		if note.on {
 			out += note.getSample()
@@ -64,9 +69,4 @@ func (self *SineWave) NoteOff(parameter1 uint8, parameter2 uint8) {
 func (self *SineWave) NoteAftertouch(parameter1 uint8, parameter2 uint8) {
 }
 func (self *SineWave) ChannelAftertouch(parameter1 uint8, parameter2 uint8) {
-}
-func (self *SineWave) generateSound(output *[]float32) {
-	for i := range *output {
-		(*output)[i] += self.getSample()
-	}
 }

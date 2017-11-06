@@ -1,86 +1,60 @@
 package main
 
 type Scheduler struct {
-	timeCounter    uint32
-	sampleCounter  uint32
-	samplesPerTick uint32
-	channels       []MidiChannel
-	quque          []MidiChannelEvent
+	eventQueue     chan *MidiChannelEvent
+	nextEvent      *MidiChannelEvent
+	instruments    []MidiChannel
+	sampleCounter  uint
+	deltaCounter   uint32
+	samplesPerTick uint
 }
 
-func (scheduler *Scheduler) addEvent(event MidiChannelEvent) {
-	if !event.isOk() {
+func (s *Scheduler) getNextEvent() (out *MidiChannelEvent, isOk bool) {
+	if s.nextEvent != nil {
+		out = s.nextEvent
+		isOk = true
+	} else {
+		select {
+		case s.nextEvent = <-s.eventQueue:
+			out = s.nextEvent
+		default:
+			s.nextEvent = nil
+			isOk = false
+		}
+	}
+	return
+}
+
+func (s *Scheduler) midiTick() {
+	ev,ok := s.getNextEvent()
+	if !ok {
 		return
 	}
-	scheduler.quque = append(scheduler.quque, event)
-}
+	for ev.deltaTime <= s.deltaCounter {
+		s.instruments[ev.Channel].handleEvent(*ev)
 
-func (scheduler *Scheduler) readSoundBite(wavetable *[]float32) {
-	for i := range *wavetable {
-		(*wavetable)[i] = 0.0
-	}
-	for _, channel := range scheduler.channels {
-		channel.getSound(wavetable)
-	}
-	return
-}
-
-func (scheduler *Scheduler) getNextSamples(sampleCount uint32, output *[]float32) {
-	if len(scheduler.quque) == 0 {
-		for i := range *output {
-			(*output)[i] = 0.0
+		s.deltaCounter = 0
+		s.nextEvent = nil
+		ev, ok = s.getNextEvent()
+		if !ok {
+			return
 		}
-		return
-	}
-
-	scheduler.tick()
-
-	scheduler.sampleCounter += sampleCount
-	if scheduler.sampleCounter >= scheduler.samplesPerTick {
-		scheduler.timeCounter++
-		scheduler.sampleCounter = sampleCount % scheduler.samplesPerTick
-	}
-	scheduler.readSoundBite(output)
-	return
-}
-
-func (scheduler *Scheduler) tick() {
-	for len(scheduler.quque) > 0 {
-		currentEvent := scheduler.quque[0]
-		if currentEvent.deltaTime > scheduler.timeCounter {
-			break
-		}
-		scheduler.quque = scheduler.quque[1:]
-		scheduler.channels[currentEvent.Channel].handleEvent(currentEvent)
-		scheduler.timeCounter = 0
 	}
 }
 
-func (scheduler *Scheduler) nextTick() (out []float32) {
-	if len(scheduler.quque) == 0 {
-		panic("queue empty")
+func (s *Scheduler) Tick() {
+	s.midiTick()
+	s.sampleCounter++
+	if s.sampleCounter >= s.samplesPerTick {
+		s.deltaCounter++
+		s.sampleCounter = 0
 	}
-	for len(scheduler.quque) > 0 {
-		currentEvent := scheduler.quque[0]
-		if currentEvent.deltaTime > scheduler.timeCounter {
-			break
-		}
-		scheduler.quque = scheduler.quque[1:]
-		scheduler.channels[currentEvent.Channel].handleEvent(currentEvent)
-		scheduler.timeCounter = 0
-	}
-	scheduler.timeCounter++
-	out = make([]float32, scheduler.samplesPerTick)
-	scheduler.readSoundBite(&out)
-	return
 }
 
-func newScheduler(samplesPerTick uint32) (scheduler *Scheduler) {
-	channels := make([]MidiChannel, 1)
+func newScheduler(instruments []MidiControllable, samplesPerTick uint) *Scheduler {
+	channels := make([]MidiChannel, len(instruments))
 	for i := 0; i < 1; i++ {
-		channels[i] = MidiChannel{MidiChannelId(i), newSineWave(44100)}
+		channels[i] = MidiChannel{MidiChannelId(i), instruments[i]}
 	}
-
-	scheduler = &Scheduler{0, 0, samplesPerTick, channels, make([]MidiChannelEvent, 0)}
-	return
+	return &Scheduler{make(chan *MidiChannelEvent, 100), nil, channels, 0, 0, samplesPerTick}
 }
